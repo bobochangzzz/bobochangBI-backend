@@ -1,11 +1,13 @@
 package com.bobochang.bi.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bobochang.bi.annotation.AuthCheck;
 import com.bobochang.bi.common.BaseResponse;
 import com.bobochang.bi.common.DeleteRequest;
 import com.bobochang.bi.common.ErrorCode;
 import com.bobochang.bi.common.ResultUtils;
+import com.bobochang.bi.constant.CommonConstant;
 import com.bobochang.bi.constant.UserConstant;
 import com.bobochang.bi.exception.BusinessException;
 import com.bobochang.bi.exception.ThrowUtils;
@@ -15,17 +17,18 @@ import com.bobochang.bi.model.dto.chart.ChartQueryRequest;
 import com.bobochang.bi.model.dto.chart.ChartUpdateRequest;
 import com.bobochang.bi.model.entity.Chart;
 import com.bobochang.bi.model.entity.User;
-import com.bobochang.bi.model.vo.ChartVO;
 import com.bobochang.bi.service.ChartService;
 import com.bobochang.bi.service.UserService;
+import com.bobochang.bi.utils.SqlUtils;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.List;
 
 /**
  * 帖子接口
@@ -62,15 +65,8 @@ public class ChartController {
         }
         Chart chart = new Chart();
         BeanUtils.copyProperties(chartAddRequest, chart);
-        List<String> tags = chartAddRequest.getTags();
-        if (tags != null) {
-            chart.setTags(GSON.toJson(tags));
-        }
-        chartService.validChart(chart, true);
         User loginUser = userService.getLoginUser(request);
         chart.setUserId(loginUser.getId());
-        chart.setFavourNum(0);
-        chart.setThumbNum(0);
         boolean result = chartService.save(chart);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         long newChartId = chart.getId();
@@ -116,12 +112,6 @@ public class ChartController {
         }
         Chart chart = new Chart();
         BeanUtils.copyProperties(chartUpdateRequest, chart);
-        List<String> tags = chartUpdateRequest.getTags();
-        if (tags != null) {
-            chart.setTags(GSON.toJson(tags));
-        }
-        // 参数校验
-        chartService.validChart(chart, false);
         long id = chartUpdateRequest.getId();
         // 判断是否存在
         Chart oldChart = chartService.getById(id);
@@ -137,7 +127,7 @@ public class ChartController {
      * @return
      */
     @GetMapping("/get/vo")
-    public BaseResponse<ChartVO> getChartVOById(long id, HttpServletRequest request) {
+    public BaseResponse<Chart> getChartVOById(long id, HttpServletRequest request) {
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -145,7 +135,7 @@ public class ChartController {
         if (chart == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
-        return ResultUtils.success(chartService.getChartVO(chart, request));
+        return ResultUtils.success(chart);
     }
 
     /**
@@ -155,16 +145,16 @@ public class ChartController {
      * @param request
      * @return
      */
-    @PostMapping("/list/page/vo")
-    public BaseResponse<Page<ChartVO>> listChartVOByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-                                                         HttpServletRequest request) {
+    @PostMapping("/list/page/")
+    public BaseResponse<Page<Chart>> listChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
+                                                       HttpServletRequest request) {
         long current = chartQueryRequest.getCurrent();
         long size = chartQueryRequest.getPageSize();
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<Chart> chartPage = chartService.page(new Page<>(current, size),
-                chartService.getQueryWrapper(chartQueryRequest));
-        return ResultUtils.success(chartService.getChartVOPage(chartPage, request));
+                getQueryWrapper(chartQueryRequest));
+        return ResultUtils.success(chartPage);
     }
 
     /**
@@ -174,9 +164,9 @@ public class ChartController {
      * @param request
      * @return
      */
-    @PostMapping("/my/list/page/vo")
-    public BaseResponse<Page<ChartVO>> listMyChartVOByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-                                                           HttpServletRequest request) {
+    @PostMapping("/my/list/page")
+    public BaseResponse<Page<Chart>> listMyChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
+                                                         HttpServletRequest request) {
         if (chartQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -187,28 +177,12 @@ public class ChartController {
         // 限制爬虫
         ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<Chart> chartPage = chartService.page(new Page<>(current, size),
-                chartService.getQueryWrapper(chartQueryRequest));
-        return ResultUtils.success(chartService.getChartVOPage(chartPage, request));
+                getQueryWrapper(chartQueryRequest));
+        return ResultUtils.success(chartPage);
     }
 
     // endregion
 
-    /**
-     * 分页搜索（从 ES 查询，封装类）
-     *
-     * @param chartQueryRequest
-     * @param request
-     * @return
-     */
-    @PostMapping("/search/page/vo")
-    public BaseResponse<Page<ChartVO>> searchChartVOByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-                                                           HttpServletRequest request) {
-        long size = chartQueryRequest.getPageSize();
-        // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
-        Page<Chart> chartPage = chartService.searchFromEs(chartQueryRequest);
-        return ResultUtils.success(chartService.getChartVOPage(chartPage, request));
-    }
 
     /**
      * 编辑（用户）
@@ -224,12 +198,6 @@ public class ChartController {
         }
         Chart chart = new Chart();
         BeanUtils.copyProperties(chartEditRequest, chart);
-        List<String> tags = chartEditRequest.getTags();
-        if (tags != null) {
-            chart.setTags(GSON.toJson(tags));
-        }
-        // 参数校验
-        chartService.validChart(chart, false);
         User loginUser = userService.getLoginUser(request);
         long id = chartEditRequest.getId();
         // 判断是否存在
@@ -241,6 +209,36 @@ public class ChartController {
         }
         boolean result = chartService.updateById(chart);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 获取查询包装类
+     *
+     * @param chartQueryRequest
+     * @return
+     */
+    private QueryWrapper<Chart> getQueryWrapper(ChartQueryRequest chartQueryRequest) {
+        QueryWrapper<Chart> queryWrapper = new QueryWrapper<>();
+        if (chartQueryRequest == null) {
+            return queryWrapper;
+        }
+        Long id = chartQueryRequest.getId();
+        String name = chartQueryRequest.getName();
+        String goal = chartQueryRequest.getGoal();
+        String chartType = chartQueryRequest.getChartType();
+        Long userId = chartQueryRequest.getUserId();
+        String sortField = chartQueryRequest.getSortField();
+        String sortOrder = chartQueryRequest.getSortOrder();
+
+        queryWrapper.eq(id != null && id > 0, "id", id);
+        queryWrapper.like(StringUtils.isNotBlank(name), "name", name);
+        queryWrapper.eq(StringUtils.isNotBlank(goal), "goal", goal);
+        queryWrapper.eq(StringUtils.isNotBlank(chartType), "chartType", chartType);
+        queryWrapper.eq(ObjectUtils.isNotEmpty(userId), "userId", userId);
+        queryWrapper.eq("isDelete", false);
+        queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
+                sortField);
+        return queryWrapper;
     }
 
 }
