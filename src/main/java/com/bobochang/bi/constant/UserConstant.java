@@ -30,5 +30,7 @@ public interface UserConstant {
      */
     String BAN_ROLE = "ban";
 
+    String DEFAULT_AVATAR = "https://img.qimuu.icu/typory/teamImg1.jpg";
+
     // endregion
 }
