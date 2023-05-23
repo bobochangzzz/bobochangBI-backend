@@ -1,7 +1,5 @@
 package com.bobochang.bi.controller;
 
-import java.util.Date;
-
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bobochang.bi.annotation.AuthCheck;
@@ -10,16 +8,13 @@ import com.bobochang.bi.common.DeleteRequest;
 import com.bobochang.bi.common.ErrorCode;
 import com.bobochang.bi.common.ResultUtils;
 import com.bobochang.bi.constant.CommonConstant;
-import com.bobochang.bi.constant.FileConstant;
 import com.bobochang.bi.constant.UserConstant;
 import com.bobochang.bi.exception.BusinessException;
 import com.bobochang.bi.exception.ThrowUtils;
 import com.bobochang.bi.manager.AiManager;
 import com.bobochang.bi.model.dto.chart.*;
-import com.bobochang.bi.model.dto.file.UploadFileRequest;
 import com.bobochang.bi.model.entity.Chart;
 import com.bobochang.bi.model.entity.User;
-import com.bobochang.bi.model.enums.FileUploadBizEnum;
 import com.bobochang.bi.model.vo.BiVO;
 import com.bobochang.bi.service.ChartService;
 import com.bobochang.bi.service.UserService;
@@ -28,7 +23,6 @@ import com.bobochang.bi.utils.SqlUtils;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +30,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.io.File;
 
 /**
  * 帖子接口

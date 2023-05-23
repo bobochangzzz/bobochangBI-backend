@@ -38,7 +38,7 @@ public interface UserConstant {
     /**
      * AI 对话模型
      */
-    Long AI_MODEL_ID = 1660898360808177665L;
+    Long AI_MODEL_ID = 1660989815224573953L;
 
     // endregion
 }
