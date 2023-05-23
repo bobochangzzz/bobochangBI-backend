@@ -1,5 +1,7 @@
 package com.bobochang.bi.controller;
 
+import java.util.Date;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bobochang.bi.annotation.AuthCheck;
@@ -8,27 +10,33 @@ import com.bobochang.bi.common.DeleteRequest;
 import com.bobochang.bi.common.ErrorCode;
 import com.bobochang.bi.common.ResultUtils;
 import com.bobochang.bi.constant.CommonConstant;
+import com.bobochang.bi.constant.FileConstant;
 import com.bobochang.bi.constant.UserConstant;
 import com.bobochang.bi.exception.BusinessException;
 import com.bobochang.bi.exception.ThrowUtils;
-import com.bobochang.bi.model.dto.chart.ChartAddRequest;
-import com.bobochang.bi.model.dto.chart.ChartEditRequest;
-import com.bobochang.bi.model.dto.chart.ChartQueryRequest;
-import com.bobochang.bi.model.dto.chart.ChartUpdateRequest;
+import com.bobochang.bi.manager.AiManager;
+import com.bobochang.bi.model.dto.chart.*;
+import com.bobochang.bi.model.dto.file.UploadFileRequest;
 import com.bobochang.bi.model.entity.Chart;
 import com.bobochang.bi.model.entity.User;
+import com.bobochang.bi.model.enums.FileUploadBizEnum;
+import com.bobochang.bi.model.vo.BiVO;
 import com.bobochang.bi.service.ChartService;
 import com.bobochang.bi.service.UserService;
+import com.bobochang.bi.utils.ExcelUtils;
 import com.bobochang.bi.utils.SqlUtils;
 import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.File;
 
 /**
  * 帖子接口
@@ -46,6 +54,9 @@ public class ChartController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AiManager aiManager;
 
     private final static Gson GSON = new Gson();
 
@@ -147,7 +158,7 @@ public class ChartController {
      */
     @PostMapping("/list/page/")
     public BaseResponse<Page<Chart>> listChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-                                                       HttpServletRequest request) {
+                                                     HttpServletRequest request) {
         long current = chartQueryRequest.getCurrent();
         long size = chartQueryRequest.getPageSize();
         // 限制爬虫
@@ -166,7 +177,7 @@ public class ChartController {
      */
     @PostMapping("/my/list/page")
     public BaseResponse<Page<Chart>> listMyChartByPage(@RequestBody ChartQueryRequest chartQueryRequest,
-                                                         HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         if (chartQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -239,6 +250,55 @@ public class ChartController {
         queryWrapper.orderBy(SqlUtils.validSortField(sortField), sortOrder.equals(CommonConstant.SORT_ORDER_ASC),
                 sortField);
         return queryWrapper;
+    }
+
+    @PostMapping("/gen")
+    public BaseResponse<BiVO> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+                                           GenchartByAiRequest genchartByAiRequest, HttpServletRequest request) {
+        // 获取请求参数中的所有值
+        String name = genchartByAiRequest.getName();
+        String goal = genchartByAiRequest.getGoal();
+        String chartType = genchartByAiRequest.getChartType();
+        String userGoal = goal;
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 拼接图表类型
+        if (StringUtils.isNotBlank(chartType)) {
+            userGoal += "，请使用" + chartType;
+        }
+        // 校验
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称长度不能超过100个字符");
+        ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标不能为空");
+        // Excel 转换 csv
+        String csvData = ExcelUtils.excel2Csv(multipartFile);
+        // 构造用户输入
+        StringBuilder userInput = new StringBuilder();
+        userInput.append("分析需求：").append("\n");
+        userInput.append(userGoal).append("\n");
+        userInput.append("原始数据：").append("\n");
+        userInput.append(csvData).append("\n");
+        String[] split = aiManager.chat2Ai(UserConstant.AI_MODEL_ID, userInput.toString()).split("【【【【【");
+        if (split.length < 3) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI解析失败");
+        }
+        String genChart = split[1].trim();
+        String genResult = split[2].trim();
+        // 数据存储到库表中
+        Chart chart = new Chart();
+        chart.setGoal(goal);
+        chart.setName(name);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+        chart.setUserId(loginUser.getId());
+        chartService.save(chart);
+        // 封装返回对象
+        BiVO biVO = new BiVO();
+        biVO.setGenChart(genChart);
+        biVO.setGenResult(genResult);
+        biVO.setChartId(chart.getId());
+        return ResultUtils.success(biVO);
     }
 
 }

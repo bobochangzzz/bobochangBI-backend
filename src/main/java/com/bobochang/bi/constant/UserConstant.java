@@ -30,7 +30,15 @@ public interface UserConstant {
      */
     String BAN_ROLE = "ban";
 
+    /**
+     * 默认头像
+     */
     String DEFAULT_AVATAR = "https://img.qimuu.icu/typory/teamImg1.jpg";
+
+    /**
+     * AI 对话模型
+     */
+    Long AI_MODEL_ID = 1660898360808177665L;
 
     // endregion
 }

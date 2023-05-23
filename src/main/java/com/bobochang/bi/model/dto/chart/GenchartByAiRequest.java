@@ -1,0 +1,32 @@
+package com.bobochang.bi.model.dto.chart;
+
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 2023/5/23 - 09:09
+ *
+ * @author bobochang
+ * @description
+ */
+@Data
+public class GenchartByAiRequest implements Serializable {
+
+    /**
+     * 名称
+     */
+    private String name;
+
+    /**
+     * 目标
+     */
+    private String goal;
+
+    /**
+     * 图表类型
+     */
+    private String chartType;
+
+    private static final long serialVersionUID = 1L;
+}
