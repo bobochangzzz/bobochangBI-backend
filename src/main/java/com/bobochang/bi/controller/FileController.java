@@ -14,8 +14,10 @@ import com.bobochang.bi.service.UserService;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Objects;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -60,8 +62,17 @@ public class FileController {
         validFile(multipartFile, fileUploadBizEnum);
         User loginUser = userService.getLoginUser(request);
         // 文件目录：根据业务、用户来划分
-        String uuid = RandomStringUtils.randomAlphanumeric(8);
-        String filename = uuid + "-" + multipartFile.getOriginalFilename();
+        String uuid = RandomStringUtils.randomAlphanumeric(8).toLowerCase();
+        String editFileName = null;
+        // 对传入的文件名进行处理
+        if (Objects.requireNonNull(multipartFile.getOriginalFilename()).contains("_")) {
+            // 去掉文件名中的_
+            editFileName = multipartFile.getOriginalFilename().replaceAll("_", "");
+        }
+        String filename = null;
+        if (editFileName != null) {
+            filename = uuid + "-" + editFileName.toLowerCase();
+        }
         String filepath = String.format("/%s/%s/%s", fileUploadBizEnum.getValue(), loginUser.getId(), filename);
         File file = null;
         try {
@@ -95,7 +106,7 @@ public class FileController {
         // 文件大小
         long fileSize = multipartFile.getSize();
         // 文件后缀
-        String fileSuffix = FileUtil.getSuffix(multipartFile.getOriginalFilename());
+        String fileSuffix = FileUtil.getSuffix(Objects.requireNonNull(multipartFile.getOriginalFilename()).toLowerCase());
         final long ONE_M = 1024 * 1024L;
         if (FileUploadBizEnum.USER_AVATAR.equals(fileUploadBizEnum)) {
             if (fileSize > ONE_M) {
