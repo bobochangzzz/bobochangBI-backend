@@ -1,5 +1,6 @@
 package com.bobochang.bi.controller;
 
+import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bobochang.bi.annotation.AuthCheck;
@@ -30,6 +31,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * 帖子接口
@@ -52,6 +55,10 @@ public class ChartController {
     private AiManager aiManager;
 
     private final static Gson GSON = new Gson();
+
+    public static final long TEN_MB = 10 * 1024 * 1024L;
+
+    public static final List<String> validFileSuffixList = Arrays.asList("xls", "xlsx");
 
     // region 增删改查
 
@@ -262,6 +269,10 @@ public class ChartController {
         // 校验
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称长度不能超过100个字符");
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标不能为空");
+        // 校验文件大小
+        ThrowUtils.throwIf(multipartFile.getSize() > TEN_MB, ErrorCode.PARAMS_ERROR, "文件大小不能超过10M");
+        // 普通校验文件是否合法
+        ThrowUtils.throwIf(!validFileSuffixList.contains(FileUtil.getSuffix(multipartFile.getOriginalFilename())), ErrorCode.PARAMS_ERROR, "文件不合法");
         // Excel 转换 csv
         String csvData = ExcelUtils.excel2Csv(multipartFile);
         // 构造用户输入
